@@ -233,7 +233,6 @@ class _DataPageState extends State<DataPage>
               "Data Specs", 
               style: TextTheme.of(context).headlineLarge?.copyWith(
                 fontWeight: FontWeight.bold, 
-                color: Colors.indigo
               )
             )
           ), //Icon
@@ -272,7 +271,6 @@ class _DataPageState extends State<DataPage>
                           data[index].fileName,
                           style: TextStyle(
                             fontSize: 30,
-                            color: Colors.indigo,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
