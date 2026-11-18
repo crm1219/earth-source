@@ -1,0 +1,161 @@
+import 'package:flutter/material.dart';
+import '../services/network_service.dart';
+import 'network.dart' as network;
+
+/// List of colors associated with each job status.
+const List<Color> statusColors = [
+  Colors.lightBlue,
+  Colors.yellow, 
+  Colors.green, 
+  Colors.red
+];
+
+/// List of strings associated with each job status.
+const List<String> statusList = ["Starting", "Running", "Complete", "Failed"];
+
+/// Possible job statuses.
+enum JobStatus {
+  starting,
+  running,
+  complete,
+  failed,
+}
+
+/// A batch job that serves to either run or train a model.
+abstract class Job 
+{
+  /// The id of the job.
+  final String id;
+  /// The name of the job.
+  String name;
+  /// The description of the job.
+  String description;
+  /// Current status of the job.
+  JobStatus status;
+  /// Time at which the job was created.
+  final DateTime createdAt;
+  /// Time at which the job was last updated.
+  DateTime lastUpdated;
+
+  /// A collection of status listeners called when the job's status changes.
+  // final List<void Function(JobStatus)> _statusListeners = [];
+
+  Job({
+    required this.id,
+    required this.createdAt,
+    required this.lastUpdated,
+    required this.name,
+    required this.description,
+    required this.status,
+  });
+
+  /// Sets a callback to be run every time the status of a given job changes.
+  Future<void> watchStatus(
+    String projectId, 
+    void Function(JobStatus status) callback
+  ) async
+  {
+    NetworkService networkService = await NetworkService.getInstance();
+    networkService.watchPredictionJobStatus(projectId, id, callback);
+  }
+
+  /// Setter function to change the status of a job.
+  void setStatus(JobStatus changedStatus)
+  {
+    status = changedStatus;
+  }
+}
+
+/// An extension of the job class used specifically for model training.
+class TrainingJob extends Job 
+{
+  final String trainingDataSpecId;
+
+  TrainingJob({
+    required super.id,
+    required super.name,
+    required super.description,
+    required super.createdAt,
+    required super.lastUpdated,
+    required super.status,
+    required this.trainingDataSpecId,
+  });
+}
+
+/// An extension of the job class used specifically for predictions, with a 
+/// corresponding layer and model id if a new model is being used.
+class PredictionJob extends Job 
+{
+  /// Layer over which the current predictions should run.
+  final String layerId;
+  /// Model id if a newly trained model is being used (defaults to base model if 
+  /// empty).
+  final String? modelId;
+  final Map<String, String?> dataAssignments;
+
+  PredictionJob({
+    required super.id,
+    required super.name,
+    required super.description,
+    required super.createdAt,
+    required super.lastUpdated,
+    required this.layerId,
+    required this.modelId,
+    this.dataAssignments = const {},
+    super.status = .starting,
+  });
+
+  /// Obtains the results of generating a prediction and returns them formatted
+  /// as a 2D list of doubles. If results are not yet available, returns an 
+  /// empty list.
+  /// 
+  /// Throws a [network.ApiNetworkException] if results file cannot be fetched.
+  /// 
+  /// TODO: make this not required projectId
+  Future<List<List<double>>> getResults(String projectId) async
+  {
+    final List<List<double>> results = [];
+    NetworkService networkService = await NetworkService.getInstance();
+    if (status != JobStatus.complete) return [];
+    assert(status == JobStatus.complete, "Job isn't complete.");
+
+    final String fileContents;
+
+    try {
+      fileContents = await networkService.fetchPredictionJobResults(
+        projectId,
+        id,
+      );
+    }
+    on network.ApiNetworkException catch (error) {
+      throw network.ApiNetworkException(
+        "Prediction file could not be fetched due to the following error:"
+        " $error",
+        error.statusCode
+      );
+    }
+
+    // Parse file contents into a 2D list of strings, then convert strings to 
+    // doubles.
+    if (fileContents == "") return [];
+
+    List<String> lines = fileContents.split('\n');
+    List<List<String>> splitLines = [];
+    for (var line in lines)
+    {
+      splitLines.add(line.split(","));
+    }
+
+    for (var i = 1; i < splitLines.length; i++) {
+      List<double> parsedList = [];
+      for (var j = 0; j < splitLines[i].length; j++) {
+        if (splitLines[i].length == 4) {
+          parsedList.add(double.parse(splitLines[i][j]));
+        }
+      }
+      if (parsedList.length == 4) results.add(parsedList);
+    }
+    
+    return results;
+  }
+}
