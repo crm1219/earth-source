@@ -38,10 +38,7 @@ async def predict(file: UploadFile = File(...)):
 
     #Identify scans containing valid measurements
     valid_scans = (
-        df[available]
-        .apply(pd.to_numeric, errors="coerce")
-        .notna()
-        .any(axis=1)
+        df[available].apply(pd.to_numeric, errors="coerce").notna().any(axis=1)
     )
     
     result_df = model.predict(df)
@@ -102,15 +99,11 @@ async def ebk(file: UploadFile = File(...)):
 
     #Identify scans with actual chemical measurements
     valid_scans = (
-        df[available]
-        .apply(pd.to_numeric, errors="coerce")
-        .notna()
-        .any(axis=1)
+        df[available].apply(pd.to_numeric, errors="coerce").notna().any(axis=1)
     )
 
     coords = (
-        df[[X_COORD, Y_COORD]]
-        .apply(pd.to_numeric, errors="coerce")
+        df[[X_COORD, Y_COORD]].apply(pd.to_numeric, errors="coerce")
     )
 
     #Exclude invalid coordinates
@@ -137,8 +130,7 @@ async def ebk(file: UploadFile = File(...)):
     ]
 
     #Verify that enough distinct locations exist
-    unique_points = location_data[[X_COORD, Y_COORD]]
-        .drop_duplicates()
+    unique_points = location_data[[X_COORD, Y_COORD]].drop_duplicates()
 
     if len(unique_points) < 10:
         raise HTTPException(
